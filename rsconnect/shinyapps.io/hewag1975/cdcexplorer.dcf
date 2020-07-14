@@ -1,0 +1,12 @@
+name: cdcexplorer
+title: cdcexplorer
+username:
+account: hewag1975
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2530428
+bundleId: 3387650
+url: https://hewag1975.shinyapps.io/cdcexplorer/
+when: 1594670904.17216
+asMultiple: FALSE
+asStatic: FALSE
