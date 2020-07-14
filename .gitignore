@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+data_download/*.zip
+data_download/*.txt
+data_download/
