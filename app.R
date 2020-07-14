@@ -35,25 +35,25 @@ ui = dashboardPage(
       ),
       
       # tab 2: Germany extremes ------------------------------------------------
-      menuItem(
-        tabName = "extr", 
-        text = "Germany - extreme wheather", 
-        icon = icon("temperature high")
-      ),
+      # menuItem(
+      #   tabName = "extr", 
+      #   text = "Germany - extreme wheather", 
+      #   icon = icon("temperature high")
+      # ),
       
       # tab 3: Germany climate graphs ------------------------------------------
-      menuItem(
-        tabName = "climgr", 
-        text = "Germany - climate graphs", 
-        icon = icon("cloud sun rain")
-      ),
+      # menuItem(
+      #   tabName = "climgr", 
+      #   text = "Germany - climate graphs", 
+      #   icon = icon("cloud sun rain")
+      # ),
       
-      # tab 4: Inernational time series ----------------------------------------
-      menuItem(
-        tabName = "ts_int", 
-        text = "International time series", 
-        icon = icon("cloud sun rain")
-      ),
+      # tab 4: International time series ----------------------------------------
+      # menuItem(
+      #   tabName = "ts_int", 
+      #   text = "International time series", 
+      #   icon = icon("cloud sun rain")
+      # ),
       
       # tab 99: about ----------------------------------------------------------
       menuItem(
@@ -171,7 +171,7 @@ ui = dashboardPage(
                fluidRow(
                  div(h4("Credits: "), 
                      "This application was built using RShiny. All code is available on ",
-                     a(href = "https://github.com/hewag1975/exploRe_shiny", "Github"), ". For bug ", 
+                     a(href = "https://github.com/hewag1975/cdcexplorer", "Github"), ". For bug ", 
                      "reports or feedback, please file an issue! ",
                      br(),
                      "Various R-packages were involved in data preparation and ",
