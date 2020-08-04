@@ -14,7 +14,7 @@ library(ggiraph)
 # scales::show_col(pal_locuszoom(alpha = 0.6)(7))
 cpal = pal_locuszoom(alpha = 0.6)(7)
 
-parameter = tribble(
+parameter_monthly = tribble(
   ~parameter, ~label, ~label_plot, ~unit,
   "mean_airtemp",       "Air temperature (monthly avg)",     "temp",     "°C",
   "mean_airtemp_max",   "Air max temperature (monthly avg)", "max temp", "°C",
@@ -29,7 +29,7 @@ parameter = tribble(
 ) %>% 
   as.data.table()
 
-Encoding(parameter$unit) = "UTF-8"
+Encoding(parameter_monthly$unit) = "UTF-8"
 
 theme_cdcexpl = theme(
   text = element_text(size = 14, colour = "#676A6D"),
@@ -53,7 +53,7 @@ data_monthly = read_rds(path = "data/monthly_kl.rds")
 data_monthly_meta = read_rds(path = "data/monthly_kl_meta.rds")
 
 # vars and period by station
-coverage = map_df(.x = parameter$parameter, .f = function(x){
+coverage = map_df(.x = parameter_monthly$parameter, .f = function(x){
   
   # x = "mean_airtemp"
   period = data_monthly[!is.na(get(x)), .SD, .SDcols = c("id", "year", x)]
@@ -62,7 +62,7 @@ coverage = map_df(.x = parameter$parameter, .f = function(x){
   
 })
 
-coverage = coverage[parameter, on = "parameter"]
+coverage = coverage[parameter_monthly, on = "parameter"]
 
 # stations
 id_subset = coverage[end == 2020 & start <= 1961][["id"]]
@@ -120,9 +120,9 @@ obs_plot_function = function(data,
   }
   
   # get varname from parameter
-  yvar = parameter[label %in% param_plot][["parameter"]]
-  ylab_unit = parameter[label %in% param_plot][["unit"]]
-  ylab_label = parameter[label %in% param_plot][["label_plot"]]
+  yvar = parameter_monthly[label %in% param_plot][["parameter"]]
+  ylab_unit = parameter_monthly[label %in% param_plot][["unit"]]
+  ylab_label = parameter_monthly[label %in% param_plot][["label_plot"]]
   
   # subset data to selected station and parameter (full period)
   cols_keep = c("id", "date", "year", "month", yvar)
