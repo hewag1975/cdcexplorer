@@ -8,92 +8,7 @@ library(rdwd)
 # options(viewer = NULL)
 
 
-# global settings and data ------------------------------------------------
-data(geoIndex)  # stations
-data(fileIndex) # index of all files (updated by rdwd package)
-data(metaIndex) # stations * products
-
-fileIndex = as.data.table(fileIndex)
-geoIndex = as.data.table(geoIndex)
-metaIndex = as.data.table(metaIndex)
-
-glimpse(fileIndex)
-glimpse(geoIndex)
-glimpse(metaIndex)
-
-geoIndex %>% filter(recentfile)
-geoIndex %>% filter(!recentfile)
-
-# convert stations to sf and save output
-geoIndex %>% 
-  # filter(nonpublic == 0) %>% 
-  select(id, name, state, elevation = ele, recent = recentfile, lon, lat) %>% 
-  st_as_sf(coords = c("lon", "lat"), crs = 4326) %>% 
-  write_rds(path = "data/geoindex.rds", compress = "gz")
-
-
-# workflow file index creation --------------------------------------------
-# creates a file index from a apecific directory on the DWD server
-# ind = indexFTP(folder = "daily/kl/historical")
-# ind = indexFTP(folder = "daily/kl/recent")
-# ind = indexFTP(folder = "monthly/kl")
-
-# creates a file index from input arguments
-# ind = createIndex(paths = "daily/kl/historical/tageswerte_00699_19490101_19580630_hist.zip", fname = "")
-
-# creates a file index from input arguments
-# ind = selectDWD(res = "monthly", var = "kl", per = "h", id = c(1, 3), outvec = TRUE)
-
-
-# workflow download and import data ---------------------------------------
-# download and return name of downloaded files
-ind_zip = dataDWD(file = ind, 
-                  dir = "data_download", 
-                  overwrite = TRUE, 
-                  read = FALSE)
-
-# import downloaded files
-dwd_data = readDWD(file = ind_zip, fread = TRUE)
-dwd_data = rbindlist(l = dwd_data, use.names = TRUE)
-
-# alternatively include read = TRUE in dataDWD
-dwd_data = dataDWD(file = ind_zip, 
-                   dir = "data_download", 
-                   overwrite = TRUE, 
-                   read = TRUE) %>%
-  rbindlist(use.names = TRUE)
-
-
-# monthly data ------------------------------------------------------------
-ind = indexFTP(folder = "monthly/kl", dir = "data_download/monthly")
-ind = ind %>% str_subset(pattern = "\\.pdf$|.\\.txt", negate = TRUE)
-ind %>% str_subset(pattern = ".\\.zip$", negate = TRUE)
-
-# joinbf (bf = base folder) required as index is created from indexFTP
-ind_zip = dataDWD(file = ind, 
-                  joinbf = TRUE, 
-                  dir = "data_download/monthly", 
-                  overwrite = TRUE, 
-                  read = FALSE)
-
-data_monthly = readDWD(file = ind_zip, 
-                       fread = TRUE, 
-                       quiet = TRUE) %>%
-  rbindlist(use.names = TRUE)
-
-# rename variables (see content of each zipfile - historical and recent)
-data_monthly[, c("MESS_DATUM_BEGINN", "MESS_DATUM_ENDE", "eor") := NULL]
-setnames(x = data_monthly, 
-         old = c("STATIONS_ID", "MESS_DATUM", "QN_4", 
-                 "MO_N", "MO_TT", "MO_TX", "MO_TN", "MO_FK", 
-                 "MX_TX", "MX_FX", "MX_TN", "MO_SD_S", 
-                 "QN_6", "MO_RR", "MX_RS"), 
-         new = c("id", "date", "quality_4", 
-                 "mean_cloudcoverage", "mean_airtemp", "mean_airtemp_max", "mean_airtemp_min", "mean_wind",
-                 "max_airtemp", "max_wind", "min_airtemp", "sum_sun", 
-                 "quality_6", "sum_rain", "max_rain"))
-
-# quality flags
+# quality flags -----------------------------------------------------------
 # source: https://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/monthly/kl/historical/DESCRIPTION_obsgermany_climate_monthly_kl_historical_en.pdf
 # The quality levels "Qualitätsniveau" (QN) given here apply for the respective following columns. The values
 # are the minima of the QN of the respective daily values. QN denotes the method of quality control, with which
@@ -111,6 +26,106 @@ setnames(x = data_monthly,
 # 8- quality control outside ROUTINE
 # 9- ROUTINE control, not all parameters corrected
 # 10- ROUTINE control finished, respective corrections finished
+
+
+# daily data ------------------------------------------------------------
+ind = indexFTP(folder = "daily/kl", dir = "data_download/daily")
+ind = ind %>% str_subset(pattern = "\\.pdf$|.\\.txt", negate = TRUE)
+ind %>% str_subset(pattern = ".\\.zip$", negate = TRUE)
+
+ind_zip = dataDWD(file = ind,
+                  joinbf = TRUE,
+                  dir = "data_download/daily",
+                  overwrite = TRUE,
+                  read = FALSE)
+
+ind_zip = list.files(path = "data_download/daily", pattern = ".zip$", full.names = TRUE)
+
+data_daily = readDWD(file = ind_zip, 
+                     fread = TRUE, 
+                     quiet = TRUE) %>%
+  rbindlist(use.names = TRUE)
+
+# rename variables (see content of each zipfile - historical and recent)
+data_daily[, c("eor") := NULL]
+setnames(x = data_daily, 
+         old = c("STATIONS_ID", "MESS_DATUM", 
+                 "QN_3", "FX", "FM",
+                 "QN_4", "RSK", "RSKF", "SDK", "SHK_TAG", 
+                 "NM", "VPM", "PM", 
+                 "TMK", "UPM", "TXK", "TNK", "TGK"), 
+         new = c("id", "date", 
+                 "quality_3", "max_wind", "mean_wind",
+                 "quality_4", "sum_prec", "form_prec", "sum_sun", "snow_depth",
+                 "mean_cloudcoverage", "mean_vapor", "mean_pressure", 
+                 "mean_airtemp", "mean_humidity", "max_airtemp", "min_airtemp",
+                 "min_groundtemp"))
+coverage = data_daily[, .(start = min(date), end = max(date)), by = id]
+coverage = coverage[end >= "2020-07-01"][["id"]]
+
+data_daily = data_daily[id %in% coverage]
+
+# check for duplicates
+data_daily = unique(data_daily)
+
+# apply removal to entire dataset
+data_daily = data_daily[, N := .N, by = c("id", "date")]
+
+data_daily_nodup = data_daily[N == 1]
+data_daily_nodup[, N := NULL]
+
+data_daily_dup = data_daily[N > 1]
+setorderv(x = data_daily_dup, cols = c("id", "date", "quality_3"), order = c(1, 1, -1))
+data_daily_dedup1 = data_daily_dup[, .SD[1], by = c("id", "date"), 
+                                   .SDcols = c("quality_3", "max_wind", "mean_wind")]
+setorderv(x = data_daily_dup, cols = c("id", "date", "quality_4"), order = c(1, 1, -1))
+data_daily_dedup2 = data_daily_dup[, .SD[1], by = c("id", "date"), 
+                                   .SDcols = c("quality_4", "sum_prec", "form_prec", "sum_sun", "snow_depth",
+                                               "mean_cloudcoverage", "mean_vapor", "mean_pressure", 
+                                               "mean_airtemp", "mean_humidity", "max_airtemp", "min_airtemp",
+                                               "min_groundtemp")]
+
+data_daily_dedup = data_daily_dedup1[data_daily_dedup2, on = c("id", "date")]
+
+data_daily = rbindlist(l = list(data_daily_nodup, data_daily_dedup), use.names = TRUE)
+
+# save result
+write_rds(x = data_daily,
+          path = "data/daily_kl.rds", 
+          compress = "gz")
+# data_daily = read_rds(path = "data/daily_kl.rds")
+
+
+# monthly data ------------------------------------------------------------
+ind = indexFTP(folder = "monthly/kl", dir = "data_download/monthly")
+ind = ind %>% str_subset(pattern = "\\.pdf$|.\\.txt", negate = TRUE)
+ind %>% str_subset(pattern = ".\\.zip$", negate = TRUE)
+
+# joinbf (bf = base folder) required as index is created from indexFTP
+ind_zip = dataDWD(file = ind,
+                  joinbf = TRUE,
+                  dir = "data_download/monthly",
+                  overwrite = TRUE,
+                  read = FALSE)
+
+ind_zip = list.files(path = "data_download/monthly", pattern = ".zip$", full.names = TRUE)
+
+data_monthly = readDWD(file = ind_zip, 
+                       fread = TRUE, 
+                       quiet = TRUE) %>%
+  rbindlist(use.names = TRUE)
+
+# rename variables (see content of each zipfile - historical and recent)
+data_monthly[, c("MESS_DATUM_BEGINN", "MESS_DATUM_ENDE", "eor") := NULL]
+setnames(x = data_monthly, 
+         old = c("STATIONS_ID", "MESS_DATUM", "QN_4", 
+                 "MO_N", "MO_TT", "MO_TX", "MO_TN", "MO_FK", 
+                 "MX_TX", "MX_FX", "MX_TN", "MO_SD_S", 
+                 "QN_6", "MO_RR", "MX_RS"), 
+         new = c("id", "date", "quality_4", 
+                 "mean_cloudcoverage", "mean_airtemp", "mean_airtemp_max", "mean_airtemp_min", "mean_wind",
+                 "max_airtemp", "max_wind", "min_airtemp", "sum_sun", 
+                 "quality_6", "sum_rain", "max_rain"))
 
 # check for duplicates
 data_monthly = unique(data_monthly)
@@ -203,3 +218,58 @@ write_rds(x = data_monthly_meta,
 
 # data_monthly_meta = read_rds(path = "data/monthly_kl_meta.rds")
 
+
+
+# stations ---------------------------------------------------------------------
+data(geoIndex)  # stations
+data(fileIndex) # index of all files (updated by rdwd package)
+data(metaIndex) # stations * products
+
+fileIndex = as.data.table(fileIndex)
+geoIndex = as.data.table(geoIndex)
+metaIndex = as.data.table(metaIndex)
+
+glimpse(fileIndex)
+glimpse(geoIndex)
+glimpse(metaIndex)
+
+geoIndex %>% filter(recentfile)
+geoIndex %>% filter(!recentfile)
+
+# convert stations to sf and save output
+geoIndex %>% 
+  select(id, name, state, elevation = ele, recent = recentfile, lon, lat) %>% 
+  st_as_sf(coords = c("lon", "lat"), crs = 4326) %>% 
+  write_rds(path = "data/geoindex.rds", compress = "gz")
+
+
+# workflow file index creation --------------------------------------------
+# creates a file index from a apecific directory on the DWD server
+# ind = indexFTP(folder = "daily/kl/historical")
+# ind = indexFTP(folder = "daily/kl/recent")
+# ind = indexFTP(folder = "monthly/kl")
+
+# creates a file index from input arguments
+# ind = createIndex(paths = "daily/kl/historical/tageswerte_00699_19490101_19580630_hist.zip", fname = "")
+
+# creates a file index from input arguments
+# ind = selectDWD(res = "monthly", var = "kl", per = "h", id = c(1, 3), outvec = TRUE)
+
+
+# workflow download and import data ---------------------------------------
+# download and return name of downloaded files
+ind_zip = dataDWD(file = ind, 
+                  dir = "data_download", 
+                  overwrite = TRUE, 
+                  read = FALSE)
+
+# import downloaded files
+dwd_data = readDWD(file = ind_zip, fread = TRUE)
+dwd_data = rbindlist(l = dwd_data, use.names = TRUE)
+
+# alternatively include read = TRUE in dataDWD
+dwd_data = dataDWD(file = ind_zip, 
+                   dir = "data_download", 
+                   overwrite = TRUE, 
+                   read = TRUE) %>%
+  rbindlist(use.names = TRUE)
