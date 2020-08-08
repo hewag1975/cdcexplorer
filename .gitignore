@@ -5,3 +5,4 @@
 data_download/*.zip
 data_download/*.txt
 data_download/
+data/daily_kl.rds
